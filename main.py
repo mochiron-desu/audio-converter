@@ -1,10 +1,6 @@
 import os
 import subprocess
-from pydub import AudioSegment
 from datetime import datetime
-
-def get_file_extension(filename):
-    return os.path.splitext(filename)[1][1:].lower()
 
 def get_media_info(file_path):
     try:
