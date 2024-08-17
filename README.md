@@ -23,9 +23,9 @@ This is a Python script that converts audio files and extracts audio from video 
 ## Usage
 
 1. Place your input audio and video files in the `input` directory.
-2. Run the `audio_video_converter.py` script:
+2. Run the `main.py` script:
    ```
-   python audio_video_converter.py
+   python main.py
    ```
 3. The converted audio files will be saved in a new folder within the `output` directory, with the folder name formatted as `YYYYMMDD_HHMMSS`.
 
@@ -47,7 +47,7 @@ audio_video_converter/
 │
 ├── output/
 │
-└── audio_video_converter.py
+└── main.py
 ```
 
 After running the script, a new folder will be created in the `output` directory with a name like `20240817_220130`. This folder will contain all the converted audio files in the specified format (default is MP3).
