@@ -6,25 +6,30 @@ from datetime import datetime
 def get_file_extension(filename):
     return os.path.splitext(filename)[1][1:].lower()
 
-def get_audio_format(file_path):
+def get_media_info(file_path):
     try:
-        # First, try using pydub
-        audio = AudioSegment.from_file(file_path)
-        return audio.format_info
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'a:0', 
+             '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        audio_codec = result.stdout.strip()
+        
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'v:0', 
+             '-count_packets', '-show_entries', 'stream=nb_read_packets', 
+             '-of', 'csv=p=0', file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        video_packets = int(result.stdout.strip() or 0)
+        
+        return audio_codec, (video_packets > 0)
     except:
-        # If pydub fails, try using ffprobe
-        try:
-            result = subprocess.run(
-                ['ffprobe', '-v', 'error', '-select_streams', 'a:0', 
-                 '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            return result.stdout.strip()
-        except:
-            # If both methods fail, return the file extension
-            return get_file_extension(file_path)
+        return None, None
 
 # Create the input and output directories
 input_dir = "input"
@@ -43,24 +48,29 @@ for filename in os.listdir(input_dir):
     
     # Check if it's a file and not a directory
     if os.path.isfile(input_path):
-        input_format = get_audio_format(input_path)
+        audio_codec, has_video = get_media_info(input_path)
         
-        if input_format:
+        if audio_codec or has_video:
             output_filename = f"{os.path.splitext(filename)[0]}.{output_format}"
             output_path = os.path.join(output_dir, output_filename)
 
             # Convert the file to output_format
             try:
-                if input_format == output_format:
+                if has_video:
+                    # Extract audio from video
+                    subprocess.run(['ffmpeg', '-i', input_path, '-vn', '-acodec', output_format, output_path])
+                    print(f"Extracted audio from video: {filename} to {output_filename}")
+                elif audio_codec == output_format:
                     # If input and output formats are the same, just copy the file
                     subprocess.run(['ffmpeg', '-i', input_path, '-acodec', 'copy', output_path])
+                    print(f"Copied: {filename} to {output_filename}")
                 else:
-                    # Convert using ffmpeg
+                    # Convert audio
                     subprocess.run(['ffmpeg', '-i', input_path, output_path])
-                print(f"Converted: {filename} to {output_filename}")
+                    print(f"Converted: {filename} to {output_filename}")
             except Exception as e:
-                print(f"Error converting {filename}: {str(e)}")
+                print(f"Error processing {filename}: {str(e)}")
         else:
-            print(f"Skipped: {filename} (not a recognized audio file)")
+            print(f"Skipped: {filename} (not a recognized audio or video file)")
 
 print(f"Conversion complete. Output files are in the folder: {output_dir}")
