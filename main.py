@@ -1,6 +1,34 @@
 import os
 import subprocess
+import shutil
+import json
 from datetime import datetime
+
+def load_config(config_path='config.json'):
+    """Load configuration from JSON file"""
+    default_config = {
+        "directories": {
+            "input": "input",
+            "base_output": "output"
+        },
+        "conversion": {
+            "output_format": "mp3"
+        },
+        "file_handling": {
+            "backup_input_files": True,
+            "delete_input_files": True
+        }
+    }
+    
+    try:
+        with open(config_path, 'r') as f:
+            user_config = json.load(f)
+            # Merge with defaults, preserving user settings
+            default_config.update(user_config)
+            return default_config
+    except FileNotFoundError:
+        print(f"Config file not found at {config_path}. Using default configuration.")
+        return default_config
 
 def get_media_info(file_path):
     try:
@@ -27,23 +55,41 @@ def get_media_info(file_path):
     except:
         return None, None
 
-# Create the input and output directories
-input_dir = "input"
-base_output_dir = "output"
-
-# Create a new folder with current date and time
-current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_dir = os.path.join(base_output_dir, current_time)
-os.makedirs(output_dir, exist_ok=True)
-
-output_format = "mp3"
-
-# Iterate over the files in the input directory
-for filename in os.listdir(input_dir):
-    input_path = os.path.join(input_dir, filename)
+def main():
+    # Load configuration
+    config = load_config()
     
-    # Check if it's a file and not a directory
-    if os.path.isfile(input_path):
+    # Extract configuration values
+    input_dir = config['directories']['input']
+    base_output_dir = config['directories']['base_output']
+    output_format = config['conversion']['output_format']
+    backup_files = config['file_handling']['backup_input_files']
+    delete_files = config['file_handling']['delete_input_files']
+
+    # Create a new folder with current date and time
+    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = os.path.join(base_output_dir, current_time)
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Create input backup folder within output directory if backup is enabled
+    backup_input_dir = None
+    if backup_files:
+        backup_input_dir = os.path.join(output_dir, "input")
+        os.makedirs(backup_input_dir, exist_ok=True)
+
+    # List of files to process
+    input_files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+
+    # Process each file
+    for filename in input_files:
+        input_path = os.path.join(input_dir, filename)
+        
+        # Backup original file if enabled
+        if backup_files:
+            backup_path = os.path.join(backup_input_dir, filename)
+            shutil.copy2(input_path, backup_path)
+            print(f"Backed up original file: {filename}")
+        
         audio_codec, has_video = get_media_info(input_path)
         
         if audio_codec or has_video:
@@ -69,4 +115,19 @@ for filename in os.listdir(input_dir):
         else:
             print(f"Skipped: {filename} (not a recognized audio or video file)")
 
-print(f"Conversion complete. Output files are in the folder: {output_dir}")
+    # Delete original files if enabled
+    if delete_files:
+        for filename in input_files:
+            input_path = os.path.join(input_dir, filename)
+            try:
+                os.remove(input_path)
+                print(f"Deleted original file: {filename}")
+            except Exception as e:
+                print(f"Error deleting {filename}: {str(e)}")
+
+    print(f"Processing complete. Output files are in the folder: {output_dir}")
+    if backup_files:
+        print(f"Original files are backed up in: {backup_input_dir}")
+
+if __name__ == "__main__":
+    main()

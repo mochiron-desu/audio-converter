@@ -1,0 +1,13 @@
+{
+    "directories": {
+        "input": "input",
+        "base_output": "output"
+    },
+    "conversion": {
+        "output_format": "mp3"
+    },
+    "file_handling": {
+        "backup_input_files": true,
+        "delete_input_files": false
+    }
+}
